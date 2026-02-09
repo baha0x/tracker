@@ -1167,12 +1167,90 @@
                 font-size: 20px;
             }
         }
-    </style>
+
+        @media (max-width: 600px) {
+            .nav {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                padding-bottom: 6px;
+            }
+            .nav-btn { white-space: nowrap; }
+            .entry-form { padding: 20px; }
+            .calendar-grid { gap: 4px; }
+            .calendar-day { font-size: 12px; }
+        }
+    
+        @media (max-width: 480px) {
+            .header { padding: 18px 0; margin-bottom: 20px; }
+            .header-right { width: 100%; justify-content: space-between; }
+            .nav { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 6px; }
+            .nav-btn { white-space: nowrap; padding: 10px 14px; font-size: 13px; }
+            .stats-grid { gap: 12px; margin-bottom: 22px; }
+            .stat-card { padding: 18px; border-radius: 14px; }
+            .stat-value { font-size: 28px; }
+            .quick-stats { gap: 10px; }
+            .quick-stat { min-width: 0; padding: 12px; }
+            .quick-stat-value { font-size: 20px; }
+            .entry-form { padding: 18px; border-radius: 14px; }
+            .action-btn { width: 100%; }
+            .nofap-container { padding: 22px; border-radius: 18px; }
+            .nofap-day-count { font-size: 56px; }
+            .day-detail-modal {
+                width: 95%;
+                max-height: 88vh;
+                padding: 18px;
+                border-radius: 16px;
+            }
+            .calendar-container { padding: 18px; }
+            .calendar-grid { gap: 4px; }
+            .calendar-day { border-radius: 8px; }
+            .calendar-day-number { font-size: 12px; }
+        }
+
+</style>
 </head>
 <body>
     <div id="root"></div>
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
+        function pad2(n) {
+            return String(n).padStart(2, '0');
+        }
+        // YYYY-MM-DD in local time (no UTC drift)
+        function formatLocalDate(d = new Date()) {
+            return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+        }
+        // Parse YYYY-MM-DD as local date
+        function parseLocalDate(dateStr) {
+            return new Date(`${dateStr}T00:00:00`);
+        }
+
+        async function normalizeLegacyEntryDates(entries) {
+            // One-time migration: fix legacy dates saved via UTC ISO (day shift) using timestamp.
+            const MIGRATION_KEY = 'dateMigration_v1_done';
+            if (localStorage.getItem(MIGRATION_KEY) === 'true') return entries;
+
+            let changed = 0;
+            for (const e of entries) {
+                if (!e || !e.timestamp || !e.date) continue;
+                const corrected = formatLocalDate(new Date(e.timestamp));
+                if (e.date !== corrected) {
+                    e.date = corrected;
+                    try {
+                        await updateEntry(e);
+                        changed++;
+                    } catch (err) {
+                        // ignore per-entry failures; keep going
+                    }
+                }
+            }
+            localStorage.setItem(MIGRATION_KEY, 'true');
+            if (changed > 0) {
+                try { showSuccessNotification(`🛠️ Исправлено дат: ${changed}`); } catch {}
+            }
+            return entries;
+        }
+
         const DB_NAME = 'MasturbationTrackerDB';
         const DB_VERSION = 3;
         const STORE_NAME = 'entries';
@@ -1370,6 +1448,7 @@
             }, [entries, userSettings]);
             const loadEntries = async () => {
                 const data = await getAllEntries();
+                await normalizeLegacyEntryDates(data);
                 setEntries(data);
             };
             const handleAddEntry = async (newEntry) => {
@@ -1406,7 +1485,7 @@
                             unlocked = streak >= 7;
                             break;
                         case 'month_control':
-                            const thisMonth = new Date().toISOString().slice(0, 7);
+                            const thisMonth = formatLocalDate(new Date()).slice(0, 7);
                             const monthEntries = entries.filter(entry => entry.date.startsWith(thisMonth));
                             unlocked = monthEntries.length < userSettings.monthlyLimit && monthEntries.length > 0;
                             break;
@@ -1422,18 +1501,18 @@
                         case 'low_frequency':
                             const lastWeekEntries = entries.filter(e => {
                                 const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-                                return new Date(e.date) >= weekAgo;
+                                return parseLocalDate(e.date) >= weekAgo;
                             });
                             unlocked = lastWeekEntries.length <= 1;
                             break;
                         case 'no_content_week':
                             const lastWeekNoContent = entries.filter(e => {
                                 const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-                                return new Date(e.date) >= weekAgo && !e.contentUsed;
+                                return parseLocalDate(e.date) >= weekAgo && !e.contentUsed;
                             });
                             const weekTotal = entries.filter(e => {
                                 const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-                                return new Date(e.date) >= weekAgo;
+                                return parseLocalDate(e.date) >= weekAgo;
                             });
                             unlocked = lastWeekNoContent.length === weekTotal.length && weekTotal.length >= 5;
                             break;
@@ -1446,7 +1525,7 @@
                             for (let i = 0; i < 30; i++) {
                                 const checkDate = new Date(today);
                                 checkDate.setDate(checkDate.getDate() - i);
-                                const dateStr = checkDate.toISOString().split('T')[0];
+                                const dateStr = formatLocalDate(checkDate);
                                 const hasEntry = entries.some(e => e.date === dateStr);
                                 if (!hasEntry) break;
                                 consecutiveDays++;
@@ -1457,7 +1536,7 @@
                             const morningEntries = entries.filter(e => {
                                 const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
                                 const hour = parseInt(e.time.split(':')[0]);
-                                return new Date(e.date) >= weekAgo && hour >= 5 && hour < 12;
+                                return parseLocalDate(e.date) >= weekAgo && hour >= 5 && hour < 12;
                             });
                             unlocked = morningEntries.length === 0;
                             break;
@@ -1465,7 +1544,7 @@
                             const nightEntries = entries.filter(e => {
                                 const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
                                 const hour = parseInt(e.time.split(':')[0]);
-                                return new Date(e.date) >= weekAgo && (hour >= 22 || hour < 5);
+                                return parseLocalDate(e.date) >= weekAgo && (hour >= 22 || hour < 5);
                             });
                             unlocked = nightEntries.length === 0;
                             break;
@@ -1496,7 +1575,7 @@
                 for (let i = 0; i < 365; i++) {
                     const checkDate = new Date(today);
                     checkDate.setDate(checkDate.getDate() - i);
-                    const dateStr = checkDate.toISOString().split('T')[0];
+                    const dateStr = formatLocalDate(checkDate);
                     const hasEntry = entries.some(e => e.date === dateStr);
                     if (hasEntry) break;
                     streak++;
@@ -1561,7 +1640,7 @@
             };
             const getWeeklyStats = () => {
                 const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-                const weekEntries = entries.filter(e => new Date(e.date) >= weekAgo);
+                const weekEntries = entries.filter(e => parseLocalDate(e.date) >= weekAgo);
                 const totalDuration = weekEntries.reduce((sum, e) => sum + (e.duration || 0), 0);
                 const avgArousal = weekEntries.length > 0 
                     ? weekEntries.reduce((sum, e) => sum + (e.arousalLevel || 5), 0) / weekEntries.length 
@@ -1613,16 +1692,17 @@
             const [selectedTriggers, setSelectedTriggers] = useState([]);
             const [customTrigger, setCustomTrigger] = useState('');
             const [note, setNote] = useState('');
-            const today = new Date().toISOString().split('T')[0];
+            const [showForm, setShowForm] = useState(false);
+            const today = formatLocalDate(new Date());
             const todayEntries = entries.filter(e => e.date === today);
-            const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            const weekAgo = formatLocalDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
             const weekEntries = entries.filter(e => e.date >= weekAgo);
             const streak = getStreak();
             const handleSubmit = () => {
                 const now = new Date();
                 const entry = {
                     id: Date.now(),
-                    date: now.toISOString().split('T')[0],
+                    date: formatLocalDate(now),
                     time: now.toTimeString().split(' ')[0].substring(0, 5),
                     type: 'Мастурбация',
                     mood,
@@ -1646,6 +1726,7 @@
                 setSelectedTriggers([]);
                 setCustomTrigger('');
                 setNote('');
+                setShowForm(false);
             };
             const toggleTrigger = (trigger) => {
                 if (selectedTriggers.includes(trigger)) {
@@ -1764,6 +1845,14 @@
                             {advice}
                         </div>
                     )}
+                    <button
+                        className="action-btn"
+                        style={{ width: '100%', marginBottom: '20px' }}
+                        onClick={() => setShowForm(v => !v)}
+                    >
+                        {showForm ? '✖ Скрыть форму' : '➕ Добавить запись'}
+                    </button>
+                    {showForm && (
                     <div className="entry-form">
                         <h2 className="section-title">✍️ Добавить запись о мастурбации</h2>
                         <div className="form-group">
@@ -1862,6 +1951,7 @@
                             ➕ Добавить запись о мастурбации
                         </button>
                     </div>
+                    )}
                 </div>
             );
         }
@@ -2052,9 +2142,9 @@
             };
             const periodComparison = () => {
                 const now = new Date();
-                const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-                const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
-                const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
+                const thisMonthStart = formatLocalDate(new Date(now.getFullYear(), now.getMonth(), 1));
+                const lastMonthStart = formatLocalDate(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+                const lastMonthEnd = formatLocalDate(new Date(now.getFullYear(), now.getMonth(), 0));
                 const thisMonth = entries.filter(e => e.date >= thisMonthStart).length;
                 const lastMonth = entries.filter(e => e.date >= lastMonthStart && e.date <= lastMonthEnd).length;
                 const diff = thisMonth - lastMonth;
@@ -2097,10 +2187,10 @@
             const getWeeklyTrend = () => {
                 const weeks = {};
                 filteredEntries.forEach(e => {
-                    const date = new Date(e.date);
+                    const date = parseLocalDate(e.date);
                     const weekStart = new Date(date);
                     weekStart.setDate(date.getDate() - date.getDay());
-                    const weekKey = weekStart.toISOString().split('T')[0];
+                    const weekKey = formatLocalDate(weekStart);
                     weeks[weekKey] = (weeks[weekKey] || 0) + 1;
                 });
                 const sortedWeeks = Object.keys(weeks).sort().slice(-8);
@@ -2112,7 +2202,7 @@
             const getPrediction = () => {
                 const last4Weeks = filteredEntries.filter(e => {
                     const fourWeeksAgo = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000);
-                    return new Date(e.date) >= fourWeeksAgo;
+                    return parseLocalDate(e.date) >= fourWeeksAgo;
                 });
                 const avgPerWeek = last4Weeks.length / 4;
                 const predicted = Math.round(avgPerWeek);
@@ -2535,7 +2625,7 @@
                     {sortedEntries.map(entry => (
                         <div key={entry.id} className="history-item" onClick={() => setEditingEntry(entry)}>
                             <div className="history-header">
-                                <div className="history-date">{new Date(entry.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                                <div className="history-date">{parseLocalDate(entry.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
                                 <div className="history-time">⏰ {entry.time}</div>
                             </div>
                             <div className="history-details">
@@ -2585,7 +2675,7 @@
             }
             for (let day = 1; day <= daysInMonth; day++) {
                 const date = new Date(year, month, day);
-                const dateStr = date.toISOString().split('T')[0];
+                const dateStr = formatLocalDate(date);
                 const dayEntries = entries.filter(e => e.date === dateStr);
                 let activityLevel = '';
                 if (dayEntries.length > 0) {
@@ -2622,7 +2712,7 @@
                 currentWeek.push(null);
             }
             for (let d = new Date(startOfYear); d <= endOfYear; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().split('T')[0];
+                const dateStr = formatLocalDate(d);
                 const dayEntries = entries.filter(e => e.date === dateStr);
                 currentWeek.push({
                     date: new Date(d),
@@ -2729,7 +2819,7 @@
                     case 'week_streak':
                         return Math.min((streak / 7) * 100, 100);
                     case 'month_control':
-                        const thisMonth = new Date().toISOString().slice(0, 7);
+                        const thisMonth = formatLocalDate(new Date()).slice(0, 7);
                         const monthEntries = entries.filter(entry => entry.date.startsWith(thisMonth));
                         return monthEntries.length > 0 ? Math.min((monthEntries.length / userSettings.monthlyLimit) * 100, 100) : 0;
                     case 'two_week_streak':
@@ -2741,13 +2831,13 @@
                     case 'low_frequency':
                         const lastWeekEntries = entries.filter(e => {
                             const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-                            return new Date(e.date) >= weekAgo;
+                            return parseLocalDate(e.date) >= weekAgo;
                         });
                         return lastWeekEntries.length <= 1 ? 100 : 50;
                     case 'no_content_week':
                         const lastWeekNoContent = entries.filter(e => {
                             const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-                            return new Date(e.date) >= weekAgo && !e.contentUsed;
+                            return parseLocalDate(e.date) >= weekAgo && !e.contentUsed;
                         });
                         return Math.min((lastWeekNoContent.length / 5) * 100, 100);
                     case 'three_month_streak':
@@ -2758,7 +2848,7 @@
                         for (let i = 0; i < 30; i++) {
                             const checkDate = new Date(today);
                             checkDate.setDate(checkDate.getDate() - i);
-                            const dateStr = checkDate.toISOString().split('T')[0];
+                            const dateStr = formatLocalDate(checkDate);
                             const hasEntry = entries.some(e => e.date === dateStr);
                             if (!hasEntry) break;
                             consecutiveDays++;
@@ -2825,7 +2915,7 @@
                 const url = URL.createObjectURL(dataBlob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = `masturbation-tracker-${new Date().toISOString().split('T')[0]}.csv`;
+                link.download = `masturbation-tracker-${formatLocalDate(new Date())}.csv`;
                 link.click();
                 showSuccessNotification('📥 Данные экспортированы');
             };
@@ -2853,7 +2943,7 @@
                 const url = URL.createObjectURL(dataBlob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = `masturbation-tracker-backup-${new Date().toISOString().split('T')[0]}.json`;
+                link.download = `masturbation-tracker-backup-${formatLocalDate(new Date())}.json`;
                 link.click();
                 showSuccessNotification('💾 Резервная копия создана');
             };
