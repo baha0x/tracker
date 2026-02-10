@@ -1273,7 +1273,7 @@ body {
 
             .bottom-nav {
                 display: grid;
-                grid-template-columns: repeat(4, 1fr);
+                grid-template-columns: repeat(5, 1fr);
                 position: fixed;
                 left: 0;
                 right: 0;
@@ -1317,6 +1317,24 @@ body {
                 border-color: rgba(255, 107, 157, 0.35);
                 color: var(--text-primary);
             }
+
+            /* Center + button */
+            .bottom-nav-item.add {
+                background: var(--accent);
+                border-color: var(--accent);
+                color: var(--bg-primary);
+                border-radius: 18px;
+                box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+                transform: translateY(-14px);
+            }
+            .bottom-nav-item.add:active {
+                transform: translateY(-12px) scale(0.98);
+            }
+            .bottom-nav-item.add .bottom-nav-label {
+                font-size: 10px;
+                letter-spacing: 0.02em;
+            }
+
 
             .bottom-nav-label {
                 font-size: 11px;
@@ -1448,6 +1466,14 @@ body {
                             <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.05.05-1.6 2.77-.07-.02a2 2 0 0 0-2.3.76l-.03.06H8.2l-.03-.06a2 2 0 0 0-2.3-.76l-.07.02-1.6-2.77.05-.05A1.8 1.8 0 0 0 4.6 15l-.02-.07V9.1l.02-.07A1.8 1.8 0 0 0 4.24 7.05l-.05-.05 1.6-2.77.07.02a2 2 0 0 0 2.3-.76l.03-.06h7.6l.03.06a2 2 0 0 0 2.3.76l.07-.02 1.6 2.77-.05.05A1.8 1.8 0 0 0 19.4 9l.02.07v5.86z" />
                         </svg>
                     );
+                case "plus":
+                    return (
+                        <svg {...common}>
+                            <path d="M12 5v14" />
+                            <path d="M5 12h14" />
+                        </svg>
+                    );
+
                 default:
                     return null;
             }
@@ -1918,9 +1944,12 @@ body {
                             <button className={`nav-btn ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}>📈 Аналитика</button>
                             <button className={`nav-btn ${activeTab === 'calendar' ? 'active' : ''}`} onClick={() => setActiveTab('calendar')}>📅 Календарь</button>
                             <button className={`nav-btn ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>📝 История</button>
+                            <button className={`nav-btn ${activeTab === 'addEntry' ? 'active' : ''}`} onClick={() => setActiveTab('addEntry')}>➕ Добавить запись</button>
                         </nav>
                     </header>
                     {activeTab === 'dashboard' && <Dashboard entries={entries} onAddEntry={handleAddEntry} onEditEntry={handleEditEntry} editingEntry={editingEntry} setEditingEntry={setEditingEntry} userSettings={userSettings} getStreak={getStreak} nofapMode={nofapMode} nofapDays={getNofapDays()} nofapRecord={getNofapRecord()} startNofap={startNofap} resetNofap={resetNofap} stopNofap={stopNofap} goalProgress={getGoalProgress()} weeklyStats={getWeeklyStats()} motivationQuote={motivationQuote} getCurrentMilestone={getCurrentMilestone} />}
+                    {activeTab === 'addEntry' && <AddEntryPage onAddEntry={handleAddEntry} onDone={() => setActiveTab('dashboard')} />}
+
                     {activeTab === 'analytics' && <Analytics entries={entries} filterTags={filterTags} setFilterTags={setFilterTags} />}
                     {activeTab === 'calendar' && <Calendar entries={entries} />}
                     {activeTab === 'history' && <History entries={entries} onDeleteEntry={handleDeleteEntry} onEditEntry={handleEditEntry} editingEntry={editingEntry} setEditingEntry={setEditingEntry} filterTags={filterTags} setFilterTags={setFilterTags} />}
@@ -1952,6 +1981,15 @@ body {
                     >
                         <Icon name="chart" size={24} />
                         <span className="bottom-nav-label">Статистика</span>
+                    </button>
+
+                    <button
+                        className={`bottom-nav-item add ${activeTab === 'addEntry' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('addEntry')}
+                        aria-label="Добавить запись"
+                    >
+                        <Icon name="plus" size={26} strokeWidth={2.5} />
+                        <span className="bottom-nav-label">Добавить</span>
                     </button>
 
                     <button
@@ -2103,6 +2141,23 @@ function Dashboard({ entries, onAddEntry, onEditEntry, editingEntry, setEditingE
                             <div className="quick-stat-label">Среднее время</div>
                         </div>
                     </div>
+                    {advice && (
+  <div
+    style={{
+      marginBottom: '20px',
+      padding: '15px',
+      background: advice.includes('Превышен')
+        ? 'var(--danger)'
+        : 'var(--success)',
+      borderRadius: '10px',
+      color: 'white',
+      fontWeight: '600'
+    }}
+  >
+    {advice}
+  </div>
+)}
+
                     <div className="stats-grid">
                         <div className="stat-card">
                             <div className="stat-label">Недельная статистика</div>
@@ -2133,25 +2188,110 @@ function Dashboard({ entries, onAddEntry, onEditEntry, editingEntry, setEditingE
                             <div className="stat-sublabel">Среднее настроение: {entries.length > 0 ? '😊' : '😐'}</div>
                         </div>
                     </div>
-                    {advice && (
-                        <div style={{ marginBottom: '20px', padding: '15px', background: advice.includes('Превышен') ? 'var(--danger)' : 'var(--success)', borderRadius: '10px', color: 'white', fontWeight: '600' }}>
-                            {advice}
-                        </div>
-                    )}
-                    <button
-                        className="action-btn"
-                        style={{ width: '100%', marginBottom: '20px' }}
-                        onClick={() => setShowForm(v => !v)}
-                    >
-                        {showForm ? '✖ Скрыть форму' : '➕ Добавить запись'}
-                    </button>
-                    {showForm && (
+                                    </div>
+            );
+        }
+        
+        function AddEntryPage({ onAddEntry, onDone }) {
+            const [mood, setMood] = useState('');
+            const [customMood, setCustomMood] = useState('');
+            const [arousalLevel, setArousalLevel] = useState(5);
+            const [location, setLocation] = useState('');
+            const [duration, setDuration] = useState(0);
+            const [contentUsed, setContentUsed] = useState(false);
+            const [orgasm, setOrgasm] = useState(false);
+            const [selectedTriggers, setSelectedTriggers] = useState([]);
+            const [customTrigger, setCustomTrigger] = useState('');
+            const [note, setNote] = useState('');
+
+            const [showAllMoods, setShowAllMoods] = useState(false);
+            const [showAllTriggers, setShowAllTriggers] = useState(false);
+
+            const TOP_MOODS = PREDEFINED_MOODS.slice(0, 4);
+            const MORE_MOODS = PREDEFINED_MOODS.slice(4);
+
+            const TOP_TRIGGERS = PREDEFINED_TRIGGERS.slice(0, 4);
+            const MORE_TRIGGERS = PREDEFINED_TRIGGERS.slice(4);
+
+            const toggleMood = (moodVal) => {
+                setMood(prev => (prev === moodVal ? '' : moodVal));
+            };
+
+            const addCustomMood = () => {
+                const value = (customMood || '').trim();
+                if (!value) return;
+                setMood(value);
+                setCustomMood('');
+            };
+
+            const toggleTrigger = (trigger) => {
+                setSelectedTriggers(prev =>
+                    prev.includes(trigger) ? prev.filter(t => t !== trigger) : [...prev, trigger]
+                );
+            };
+
+            const addCustomTrigger = () => {
+                const value = (customTrigger || '').trim();
+                if (!value) return;
+                if (!selectedTriggers.includes(value)) setSelectedTriggers(prev => [...prev, value]);
+                setCustomTrigger('');
+            };
+
+            const handleSubmit = () => {
+                const now = new Date();
+                const entry = {
+                    id: Date.now(),
+                    date: formatLocalDate(now),
+                    time: now.toTimeString().split(' ')[0].substring(0, 5),
+                    type: 'Мастурбация',
+                    mood,
+                    arousalLevel,
+                    location: location || 'Не указано',
+                    duration,
+                    contentUsed,
+                    orgasm,
+                    triggers: selectedTriggers,
+                    note,
+                    timestamp: now.toISOString()
+                };
+
+                onAddEntry(entry);
+
+                // reset (на всякий)
+                setMood('');
+                setCustomMood('');
+                setArousalLevel(5);
+                setLocation('');
+                setDuration(0);
+                setContentUsed(false);
+                setOrgasm(false);
+                setSelectedTriggers([]);
+                setCustomTrigger('');
+                setNote('');
+                setShowAllMoods(false);
+                setShowAllTriggers(false);
+
+                if (typeof onDone === 'function') onDone();
+            };
+
+            return (
+                <div className="fade-in">
                     <div className="entry-form">
                         <h2 className="section-title">✍️ Добавить запись о мастурбации</h2>
+
                         <div className="form-group">
                             <label className="form-label">Настроение после</label>
                             <div className="tags-container">
-                                {PREDEFINED_MOODS.map(moodVal => (
+                                {TOP_MOODS.map(moodVal => (
+                                    <button
+                                        key={moodVal}
+                                        className={`tag-btn ${mood === moodVal ? 'active' : ''}`}
+                                        onClick={() => toggleMood(moodVal)}
+                                    >
+                                        {moodVal}
+                                    </button>
+                                ))}
+                                {showAllMoods && MORE_MOODS.map(moodVal => (
                                     <button
                                         key={moodVal}
                                         className={`tag-btn ${mood === moodVal ? 'active' : ''}`}
@@ -2161,47 +2301,70 @@ function Dashboard({ entries, onAddEntry, onEditEntry, editingEntry, setEditingE
                                     </button>
                                 ))}
                             </div>
-                            <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    value={customMood}
-                                    onChange={(e) => setCustomMood(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && addCustomMood()}
-                                    placeholder="Своё настроение..."
-                                />
-                                <button className="nav-btn" onClick={addCustomMood}>Добавить</button>
+
+                            <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
+                                {MORE_MOODS.length > 0 && (
+                                    <button className="nav-btn" onClick={() => setShowAllMoods(v => !v)}>
+                                        {showAllMoods ? 'Скрыть' : 'Еще'}
+                                    </button>
+                                )}
+                                <div style={{ display: 'flex', gap: '10px', flex: 1, minWidth: '240px' }}>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={customMood}
+                                        onChange={(e) => setCustomMood(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && addCustomMood()}
+                                        placeholder="Своё настроение."
+                                    />
+                                    <button className="nav-btn" onClick={addCustomMood}>Добавить</button>
+                                </div>
                             </div>
                         </div>
+
                         <div className="form-group">
                             <label className="form-label">Уровень возбуждения перед: {arousalLevel}/10</label>
                             <input type="range" min="1" max="10" value={arousalLevel} onChange={(e) => setArousalLevel(parseInt(e.target.value))} className="slider" />
                             <div className="slider-value">{arousalLevel}/10</div>
                         </div>
+
                         <div className="form-group">
                             <label className="form-label">Место (необязательно)</label>
                             <input type="text" className="form-input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="дом, работа, ванная и т.д." />
                         </div>
+
                         <div className="form-group">
                             <label className="form-label">Длительность (минуты)</label>
                             <input type="number" className="form-input" min="0" max="180" value={duration} onChange={(e) => setDuration(parseInt(e.target.value) || 0)} placeholder="0" />
                         </div>
+
                         <div className="form-group">
                             <label className="checkbox-label">
                                 <input type="checkbox" checked={contentUsed} onChange={(e) => setContentUsed(e.target.checked)} className="checkbox" />
                                 Использовался контент (порно, фото и т.д.)
                             </label>
                         </div>
+
                         <div className="form-group">
                             <label className="checkbox-label">
                                 <input type="checkbox" checked={orgasm} onChange={(e) => setOrgasm(e.target.checked)} className="checkbox" />
                                 Достигнут оргазм
                             </label>
                         </div>
+
                         <div className="form-group">
                             <label className="form-label">Триггеры / причины (необязательно)</label>
                             <div className="tags-container">
-                                {PREDEFINED_TRIGGERS.map(trigger => (
+                                {TOP_TRIGGERS.map(trigger => (
+                                    <button
+                                        key={trigger}
+                                        className={`tag-btn ${selectedTriggers.includes(trigger) ? 'active' : ''}`}
+                                        onClick={() => toggleTrigger(trigger)}
+                                    >
+                                        {trigger}
+                                    </button>
+                                ))}
+                                {showAllTriggers && MORE_TRIGGERS.map(trigger => (
                                     <button
                                         key={trigger}
                                         className={`tag-btn ${selectedTriggers.includes(trigger) ? 'active' : ''}`}
@@ -2211,44 +2374,41 @@ function Dashboard({ entries, onAddEntry, onEditEntry, editingEntry, setEditingE
                                     </button>
                                 ))}
                             </div>
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">Свой триггер</label>
-                            <div style={{ display: 'flex', gap: '10px' }}>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    value={customTrigger}
-                                    onChange={(e) => setCustomTrigger(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && addCustomTrigger()}
-                                    placeholder="Введи свой триггер..."
-                                />
-                                <button className="nav-btn" onClick={addCustomTrigger}>Добавить</button>
-                            </div>
-                        </div>
-                        {selectedTriggers.length > 0 && (
-                            <div style={{ marginBottom: '20px' }}>
-                                <div className="form-label">Выбрано триггеров: {selectedTriggers.length}</div>
-                                <div className="tags-container">
-                                    {selectedTriggers.map(trigger => (
-                                        <span key={trigger} className="history-badge">{trigger}</span>
-                                    ))}
+
+                            <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
+                                {MORE_TRIGGERS.length > 0 && (
+                                    <button className="nav-btn" onClick={() => setShowAllTriggers(v => !v)}>
+                                        {showAllTriggers ? 'Скрыть' : 'Еще'}
+                                    </button>
+                                )}
+                                <div style={{ display: 'flex', gap: '10px', flex: 1, minWidth: '240px' }}>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={customTrigger}
+                                        onChange={(e) => setCustomTrigger(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && addCustomTrigger()}
+                                        placeholder="Свой триггер."
+                                    />
+                                    <button className="nav-btn" onClick={addCustomTrigger}>Добавить</button>
                                 </div>
                             </div>
-                        )}
-                        <div className="form-group">
-                            <label className="form-label">Заметки / мысли после (необязательно)</label>
-                            <textarea className="form-textarea" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Как себя чувствуешь? Что думаешь об этом? Есть ли сожаления?"></textarea>
                         </div>
-                        <button className="action-btn" onClick={handleSubmit}>
-                            ➕ Добавить запись о мастурбации
+
+                        <div className="form-group">
+                            <label className="form-label">Заметка (необязательно)</label>
+                            <textarea className="form-textarea" value={note} onChange={(e) => setNote(e.target.value)} placeholder="что почувствовал, что стало триггером, мысли..." />
+                        </div>
+
+                        <button className="action-btn" style={{ width: '100%' }} onClick={handleSubmit}>
+                            ✅ Сохранить запись
                         </button>
                     </div>
-                    )}
                 </div>
             );
         }
-        function EditEntryModal({ entry, onSave, onCancel }) {
+
+function EditEntryModal({ entry, onSave, onCancel }) {
             const [mood, setMood] = useState(entry.mood || '');
             const [arousalLevel, setArousalLevel] = useState(entry.arousalLevel || 5);
             const [location, setLocation] = useState(entry.location || '');
